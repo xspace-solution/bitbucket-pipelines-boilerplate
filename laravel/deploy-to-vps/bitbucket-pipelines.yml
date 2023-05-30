@@ -1,0 +1,28 @@
+image: php:7.2-fpm
+
+pipelines:
+  branches:
+    master:
+       - step:
+          name: Deploy to VPS
+          deployment: production
+          caches:
+            - composer
+          script:
+            # Install dependencies
+            - apt-get update && apt-get install -y ssh rsync git zip unzip
+            # Stop Nginx Server
+            - ssh $SSH_USER@$SSH_HOST "sudo service nginx stop"
+            # Install Composer
+            - curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
+            - php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+            - composer --version
+            # Install Dependencies
+            - composer install --no-ansi --no-interaction --no-progress
+            # Copy environment variables
+            - cp .env.pipelines .env
+            # Copy code to VPS using SSH
+            - rsync -avz --delete ./ $SSH_USER@$SSH_HOST:/var/www/html/            
+            # Restart nginx server            
+            - ssh $SSH_USER@$SSH_HOST "cd /var/www/html && composer update"
+            - ssh $SSH_USER@$SSH_HOST "sudo service nginx restart"
